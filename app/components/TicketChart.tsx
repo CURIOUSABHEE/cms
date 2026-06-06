@@ -1,6 +1,6 @@
 'use client'
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 type Props = { data: { date: string; count: number }[] }
 
@@ -28,53 +28,40 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function TicketChart({ data }: Props) {
-  // Map to day-of-week labels
   const formatted = data.map((d, i) => ({
     ...d,
     day: DAYS[i % 7],
     label: d.date.slice(5),
   }))
 
-  // Find the highest bar index
-  const maxIdx = formatted.reduce((acc, d, i) => d.count > formatted[acc].count ? i : acc, 0)
+  const sortedByCount = formatted
+    .map((d, i) => ({ ...d, index: i }))
+    .sort((a, b) => b.count - a.count)
+  const peakIdx = sortedByCount[0]?.index ?? 0
+  const secondIdx = sortedByCount.length > 1 ? sortedByCount[1].index : 0
 
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={formatted} margin={{ top: 4, right: 4, bottom: 0, left: -20 }} barGap={8}>
-        <CartesianGrid strokeDasharray="0" stroke="var(--border-light)" vertical={false} />
+      <BarChart data={formatted} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={8}>
+        <defs>
+          <pattern id="barHatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--border)" strokeWidth="2" />
+          </pattern>
+        </defs>
+        <CartesianGrid strokeDasharray="0" stroke="var(--border-light)" vertical={false} horizontal={false} />
         <XAxis
           dataKey="day"
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 12, fill: 'var(--text-faint)', fontFamily: 'var(--font)', fontWeight: 500 }}
         />
-        <YAxis
-          allowDecimals={false}
-          axisLine={false}
-          tickLine={false}
-          tick={{ fontSize: 11, fill: 'var(--text-faint)', fontFamily: 'var(--font)' }}
-          width={28}
-        />
         <Tooltip content={<CustomTooltip />} cursor={false} />
         <Bar dataKey="count" radius={[12, 12, 12, 12]} maxBarSize={36}>
           {formatted.map((entry, index) => {
-            const isMax = index === maxIdx && entry.count > 0
-            const isEmpty = entry.count === 0
-            return (
-              <Cell
-                key={`cell-${index}`}
-                fill={
-                  isMax
-                    ? 'var(--green-600)'
-                    : isEmpty
-                    ? 'var(--border)'
-                    : index % 2 === 0
-                    ? 'var(--green-900)'
-                    : 'var(--green-300)'
-                }
-                opacity={isEmpty ? 0.4 : 1}
-              />
-            )
+            if (entry.count === 0) return <Cell key={`cell-${index}`} fill="url(#barHatch)" opacity={0.4} />
+            if (index === peakIdx) return <Cell key={`cell-${index}`} fill="var(--green-600)" />
+            if (index === secondIdx) return <Cell key={`cell-${index}`} fill="var(--green-300)" />
+            return <Cell key={`cell-${index}`} fill="url(#barHatch)" />
           })}
         </Bar>
       </BarChart>

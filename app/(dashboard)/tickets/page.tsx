@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import StatusBadge from '../components/StatusBadge'
-import PriorityBadge from '../components/PriorityBadge'
+import StatusBadge from '../../components/StatusBadge'
+import PriorityBadge from '../../components/PriorityBadge'
 
 type Ticket = {
   ticket_id: string
@@ -34,35 +34,58 @@ export default function TicketsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalTickets, setTotalTickets] = useState(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fetchTickets = useCallback(async (q = search, st = statusFilter, pr = priorityFilter) => {
+  const fetchTickets = useCallback(async (q = search, st = statusFilter, pr = priorityFilter, targetPage = page) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (q) params.set('search', q)
       if (st) params.set('status', st)
       if (pr) params.set('priority', pr)
+      params.set('page', String(targetPage))
+      params.set('limit', '10')
       const res = await fetch(`/api/tickets?${params}`)
-      const data = await res.json()
-      setTickets(Array.isArray(data) ? data : [])
+      if (res.ok) {
+        const data = await res.json()
+        if (data && typeof data === 'object' && Array.isArray(data.tickets)) {
+          setTickets(data.tickets)
+          setTotalPages(data.totalPages || 1)
+          setTotalTickets(data.total || 0)
+        } else {
+          setTickets([])
+          setTotalPages(1)
+          setTotalTickets(0)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch tickets', err)
     } finally {
       setLoading(false)
     }
-  }, []) // eslint-disable-line
+  }, [page, search, statusFilter, priorityFilter])
 
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [search, statusFilter, priorityFilter])
+
+  // Fetch tickets on page or filter changes (debounced)
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      fetchTickets(search, statusFilter, priorityFilter)
+      fetchTickets(search, statusFilter, priorityFilter, page)
     }, 280)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [search, statusFilter, priorityFilter]) // eslint-disable-line
+  }, [page, search, statusFilter, priorityFilter, fetchTickets])
 
   useEffect(() => {
-    const iv = setInterval(() => fetchTickets(), 30000)
+    const iv = setInterval(() => fetchTickets(search, statusFilter, priorityFilter, page), 30000)
     return () => clearInterval(iv)
-  }, [fetchTickets])
+  }, [fetchTickets, search, statusFilter, priorityFilter, page])
 
   function exportCSV() {
     const headers = ['Ticket ID', 'Customer Name', 'Customer Email', 'Subject', 'Description', 'Status', 'Priority', 'Created At']
@@ -79,7 +102,7 @@ export default function TicketsPage() {
   const hasFilters = !!(search || statusFilter || priorityFilter)
 
   return (
-    <div style={{ padding: '1.75rem 2rem', maxWidth: '1400px' }}>
+    <div style={{ padding: '1.75rem 2rem', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
       <div className="animate-fade-up" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
@@ -216,6 +239,132 @@ export default function TicketsPage() {
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div
+          className="animate-fade-up stagger-3"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: '1.25rem',
+            padding: '0.75rem 1.25rem',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-light)',
+            borderRadius: 'var(--radius-lg)',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}
+        >
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Showing <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{Math.min(totalTickets, (page - 1) * 10 + 1)}-{Math.min(totalTickets, page * 10)}</span> of <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{totalTickets}</span> tickets
+          </div>
+          
+          <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* First Button */}
+            <button
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+              className="btn-secondary"
+              style={{
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.75rem',
+                opacity: page === 1 ? 0.4 : 1,
+                cursor: page === 1 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              First
+            </button>
+            
+            {/* Prev Button */}
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="btn-secondary"
+              style={{
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                opacity: page === 1 ? 0.4 : 1,
+                cursor: page === 1 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              Prev
+            </button>
+
+            {/* Page indicators */}
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+              .map((p, idx, arr) => {
+                const showEllipsis = idx > 0 && p - arr[idx - 1] > 1
+                return (
+                  <div key={p} style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
+                    {showEllipsis && <span style={{ fontSize: '0.75rem', color: 'var(--text-faint)', padding: '0 0.25rem' }}>...</span>}
+                    <button
+                      onClick={() => setPage(p)}
+                      style={{
+                        padding: '0.35rem 0.65rem',
+                        fontSize: '0.75rem',
+                        fontWeight: p === page ? 700 : 500,
+                        border: '1.5px solid',
+                        borderColor: p === page ? 'var(--green-900)' : 'var(--border)',
+                        background: p === page ? 'var(--green-900)' : 'transparent',
+                        color: p === page ? '#fff' : 'var(--text-secondary)',
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {p}
+                    </button>
+                  </div>
+                )
+              })}
+
+            {/* Next Button */}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="btn-secondary"
+              style={{
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                opacity: page === totalPages ? 0.4 : 1,
+                cursor: page === totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Next
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+
+            {/* Last Button */}
+            <button
+              onClick={() => setPage(totalPages)}
+              disabled={page === totalPages}
+              className="btn-secondary"
+              style={{
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.75rem',
+                opacity: page === totalPages ? 0.4 : 1,
+                cursor: page === totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Last
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

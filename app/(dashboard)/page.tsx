@@ -3,20 +3,23 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import StatusBadge from './components/StatusBadge'
-import PriorityBadge from './components/PriorityBadge'
+import StatusBadge from '../components/StatusBadge'
+import PriorityBadge from '../components/PriorityBadge'
+import { useAuth } from '../context/AuthContext'
 
-const TicketChart = dynamic(() => import('./components/TicketChart'), { ssr: false })
-const GaugeChart = dynamic(() => import('./components/GaugeChart'), { ssr: false })
+const TicketChart = dynamic(() => import('../components/TicketChart'), { ssr: false })
+const GaugeChart = dynamic(() => import('../components/GaugeChart'), { ssr: false })
 
 type Ticket = {
   ticket_id: string
+  ticket_number?: string
   customer_name: string
   customer_email: string
   subject: string
   status: string
   priority: string
   created_at: string
+  category?: { name: string }
 }
 type Analytics = {
   total: number
@@ -74,11 +77,11 @@ function StatCard({ label, value, sub, href }: { label: string; value: number; s
 }
 
 /* ── Stat card (dark — Total Tickets) ───────────────────── */
-function StatCardDark({ value }: { value: number }) {
+function StatCardDark({ value, label = "Total Tickets", sub = "Increased from last month" }: { value: number; label?: string; sub?: string }) {
   return (
     <div className="card-dark" style={{ padding: '1.25rem 1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-        <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)' }}>Total Tickets</p>
+        <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)' }}>{label}</p>
         <div style={{ width: 28, height: 28, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
@@ -93,7 +96,7 @@ function StatCardDark({ value }: { value: number }) {
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
           </svg>
-          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Increased from last month</span>
+          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>{sub}</span>
         </div>
       </div>
     </div>
@@ -102,7 +105,7 @@ function StatCardDark({ value }: { value: number }) {
 
 /* ── Recent activity (SLA alerts) ───────────────────────── */
 function RecentActivity({ tickets }: { tickets: Ticket[] }) {
-  const urgent = tickets.filter(t => t.priority === 'Urgent' || t.status === 'Open').slice(0, 1)
+  const urgent = tickets.filter(t => t.priority === 'CRITICAL' || t.priority === 'HIGH' || t.status === 'OPEN').slice(0, 1)
   const ticket = urgent[0]
   return (
     <div className="card" style={{ padding: '1.25rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -216,7 +219,7 @@ function TeamCollaboration({ tickets }: { tickets: Ticket[] }) {
                 {t.customer_name}
               </p>
               <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Working on <span style={{ fontStyle: 'italic' }}>{t.subject}</span>
+                Working on <span style={{ fontWeight: 700 }}>{t.subject}</span>
               </p>
             </div>
             <StatusBadge status={t.status} />
@@ -232,72 +235,130 @@ function TeamCollaboration({ tickets }: { tickets: Ticket[] }) {
   )
 }
 
-/* ── Response timer card ────────────────────────────────── */
-function ResponseTimer() {
-  const [seconds, setSeconds] = useState(0)
-  const [running, setRunning] = useState(true)
-
-  useEffect(() => {
-    if (!running) return
-    const id = setInterval(() => setSeconds(s => s + 1), 1000)
-    return () => clearInterval(id)
-  }, [running])
-
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  const fmt = (n: number) => String(n).padStart(2, '0')
-
+/* ── Customer Portal View ────────────────────────────────── */
+function CustomerDashboardView({ tickets, loading, user }: { tickets: Ticket[]; loading: boolean; user: any }) {
+  const activeCount = tickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS' || t.status === 'WAITING_FOR_CUSTOMER').length
+  const resolvedCount = tickets.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED').length
+  
   return (
-    <div className="card-dark" style={{ padding: '1.25rem', position: 'relative', overflow: 'hidden' }}>
-      {/* Decorative circles */}
-      <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
-      <div style={{ position: 'absolute', bottom: '-20px', left: '-20px', width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.03)' }} />
-      <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: '0.75rem' }}>
-        Response Timer
-      </p>
-      <p
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: '1.75rem',
-          fontWeight: 600,
-          color: '#fff',
-          letterSpacing: '0.05em',
-          marginBottom: '1rem',
-          lineHeight: 1,
-        }}
-      >
-        {fmt(h)}:{fmt(m)}:{fmt(s)}
-      </p>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
-        <button
-          onClick={() => setRunning(r => !r)}
-          style={{
-            width: '32px', height: '32px', borderRadius: '50%',
-            background: 'rgba(255,255,255,0.15)', border: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', transition: 'background 0.15s', color: 'white',
-          }}
-          aria-label={running ? 'Pause' : 'Resume'}
-        >
-          {running ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
-          ) : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M5 3l14 9-14 9V3z" /></svg>
-          )}
-        </button>
-        <button
-          onClick={() => { setSeconds(0); setRunning(false) }}
-          style={{
-            width: '32px', height: '32px', borderRadius: '50%',
-            background: '#EF4444', border: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', transition: 'background 0.15s',
-          }}
-          aria-label="Stop"
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
-        </button>
+    <div style={{ padding: '1.75rem 2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      {/* Page Header */}
+      <div className="animate-fade-up" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '0.25rem' }}>
+            Welcome back{user ? `, ${user.name}` : ''} 👋
+          </h1>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            Need assistance? Submit a ticket and our team will get in touch with you.
+          </p>
+        </div>
+        <div>
+          <Link href="/tickets/new" className="btn-primary" style={{ textDecoration: 'none' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Create New Ticket
+          </Link>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ marginBottom: '2rem' }}>
+        <div className="animate-fade-up stagger-1">
+          {loading ? (
+            <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}><Sk w={80} h={12} /> <Sk w={28} h={28} r={14} /></div>
+              <Sk w={48} h={36} r={6} />
+            </div>
+          ) : <StatCardDark value={tickets.length} label="My Tickets" sub="All registered tickets" />}
+        </div>
+
+        <div className="animate-fade-up stagger-2">
+          {loading ? (
+            <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}><Sk w={80} h={12} /> <Sk w={28} h={28} r={14} /></div>
+              <Sk w={48} h={36} r={6} />
+            </div>
+          ) : <StatCard label="Active Tickets" value={activeCount} sub="In Progress or Open" />}
+        </div>
+
+        <div className="animate-fade-up stagger-3">
+          {loading ? (
+            <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}><Sk w={80} h={12} /> <Sk w={28} h={28} r={14} /></div>
+              <Sk w={48} h={36} r={6} />
+            </div>
+          ) : <StatCard label="Resolved Tickets" value={resolvedCount} sub="Completed support requests" />}
+        </div>
+      </div>
+
+      {/* Tickets List */}
+      <div className="card animate-fade-up stagger-2" style={{ padding: '1.5rem', overflow: 'hidden' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1.25rem' }}>
+          My Support Requests
+        </h2>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--bg-elevated)' }}>
+                {['Ticket ID', 'Subject', 'Category', 'Status', 'Priority', 'Last Updated'].map(h => (
+                  <th key={h} style={{ padding: '0.75rem 1.25rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    {[80, 200, 100, 70, 70, 90].map((w, j) => (
+                      <td key={j} style={{ padding: '1rem 1.25rem' }}>
+                        <Sk w={w} h={13} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : tickets.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>
+                    <div className="empty-state">
+                      <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--green-50)', border: '1px solid var(--green-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                        🎫
+                      </div>
+                      <p style={{ fontWeight: 700, color: 'var(--text-primary)' }}>You don't have any support tickets yet.</p>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>If you need help with an order, billing, or technical issues, create a support ticket.</p>
+                      <Link href="/tickets/new" className="btn-primary" style={{ textDecoration: 'none' }}>Submit a Ticket</Link>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                tickets.map(t => (
+                  <tr key={t.ticket_id} className="table-row">
+                    <td style={{ padding: '0.875rem 1.25rem' }}>
+                      <Link href={`/tickets/${t.ticket_id}`} className="ticket-id" style={{ textDecoration: 'none' }}>
+                        {t.ticket_number || `TKT-${t.ticket_id.slice(0, 5)}`}
+                      </Link>
+                    </td>
+                    <td style={{ padding: '0.875rem 1.25rem' }}>
+                      <Link href={`/tickets/${t.ticket_id}`} style={{ textDecoration: 'none', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.875rem' }}>
+                        {t.subject}
+                      </Link>
+                    </td>
+                    <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                      {t.category?.name || 'General'}
+                    </td>
+                    <td style={{ padding: '0.875rem 1.25rem' }}><StatusBadge status={t.status} /></td>
+                    <td style={{ padding: '0.875rem 1.25rem' }}><PriorityBadge priority={t.priority} /></td>
+                    <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
+                      {new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -305,40 +366,66 @@ function ResponseTimer() {
 
 /* ═══════════════════════════════════════════════════════════
    MAIN DASHBOARD
-═══════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════ */
 export default function Dashboard() {
+  const { user } = useAuth()
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
+    if (!user) return
     try {
-      const [a, t] = await Promise.all([
-        fetch('/api/analytics').then(r => r.json()),
-        fetch('/api/tickets').then(r => r.json()),
-      ])
-      setAnalytics(a)
-      setTickets(Array.isArray(t) ? t : [])
+      if (user.role === 'CUSTOMER') {
+        const res = await fetch('/api/tickets')
+        if (res.ok) {
+          const t = await res.json()
+          setTickets(Array.isArray(t) ? t : [])
+        }
+      } else {
+        const [aRes, tRes] = await Promise.all([
+          fetch('/api/analytics'),
+          fetch('/api/tickets')
+        ])
+        if (aRes.ok) {
+          const a = await aRes.json()
+          setAnalytics(a)
+        }
+        if (tRes.ok) {
+          const t = await tRes.json()
+          setTickets(Array.isArray(t) ? t : [])
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard data', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    if (user) {
+      fetchData()
+    }
+  }, [user, fetchData])
+
+  if (user?.role === 'CUSTOMER') {
+    return <CustomerDashboardView tickets={tickets} loading={loading} user={user} />
+  }
 
   const total      = analytics?.total ?? 0
-  const open       = analytics?.byStatus.Open ?? 0
-  const inProgress = analytics?.byStatus['In Progress'] ?? 0
-  const closed     = analytics?.byStatus.Closed ?? 0
+  const open       = analytics?.byStatus?.Open ?? 0
+  const inProgress = analytics?.byStatus?.['InProgress'] || analytics?.byStatus?.['IN_PROGRESS'] || 0
+  const closed     = analytics?.byStatus?.Closed ?? 0
   const resRate    = total > 0 ? Math.round((closed / total) * 100) : 0
 
   return (
-    <div style={{ padding: '1.75rem 2rem', maxWidth: '1400px' }}>
+    <div style={{ padding: '1.75rem 2rem', maxWidth: '1400px', margin: '0 auto' }}>
       {/* ── Page header ── */}
       <div className="animate-fade-up" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '0.25rem' }}>
-            Dashboard
+            Welcome{user ? `, ${user.name}` : ''} 👋
           </h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
             Plan, prioritize, and resolve your support tickets with ease.
@@ -358,7 +445,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Main grid ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 260px', gridTemplateRows: 'auto auto auto auto', gap: '1rem' }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_260px] gap-4">
 
         {/* ── Row 1: Stats ─────────────────────────────────── */}
         <div className="animate-fade-up stagger-1">
@@ -407,25 +494,35 @@ export default function Dashboard() {
         </div>
 
         {/* ── Row 2: Analytics chart (col 1-3) | Reminders (col 4) ── */}
-        <div className="card animate-fade-up stagger-2" style={{ gridColumn: '1 / 4', padding: '1.25rem 1.5rem' }}>
+        <div className="card animate-fade-up stagger-2 md:col-span-2 xl:col-span-3" style={{ padding: '1.25rem 1.5rem' }}>
           <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1.25rem' }}>
             Ticket Analytics
           </h3>
-          {loading
+          {loading || !analytics
             ? <div className="skeleton" style={{ height: 200, borderRadius: 8 }} />
-            : <TicketChart data={analytics!.ticketsPerDay} />
+            : <TicketChart data={analytics.ticketsPerDay} />
           }
         </div>
 
-        <div className="animate-fade-up stagger-3" style={{ gridColumn: '4 / 5' }}>
+        <div className="animate-fade-up stagger-3 md:col-span-1 xl:col-span-1">
           {loading
             ? <div className="card" style={{ height: '100%' }}><div className="skeleton" style={{ height: '100%', borderRadius: 16 }} /></div>
             : <RecentActivity tickets={tickets} />
           }
         </div>
 
-        {/* ── Row 3: Team collab (col 1-2) | Gauge (col 3) | Queue (col 4, rows 3-4) ── */}
-        <div className="card animate-fade-up stagger-3" style={{ gridColumn: '1 / 3', padding: '1.25rem' }}>
+        {/* ── Row 3: Gauge (col 1) | Team collab (col 2-3) | Queue (col 4) ── */}
+        <div className="card animate-fade-up stagger-4 md:col-span-1 xl:col-span-1" style={{ padding: '1.25rem' }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+            Resolution Progress
+          </h3>
+          {loading || !analytics
+            ? <div className="skeleton" style={{ height: 180, borderRadius: 8, marginTop: '0.5rem' }} />
+            : <GaugeChart value={resRate} closed={closed} total={total} inProgress={inProgress} />
+          }
+        </div>
+
+        <div className="card animate-fade-up stagger-3 md:col-span-2 xl:col-span-2" style={{ padding: '1.25rem' }}>
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {[1,2,3,4].map(i => <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}><Sk w={32} h={32} r={16} /><div style={{ flex: 1 }}><Sk w="60%" h={12} /><div style={{ marginTop: '4px' }}><Sk w="80%" h={10} /></div></div></div>)}
@@ -433,26 +530,11 @@ export default function Dashboard() {
           ) : <TeamCollaboration tickets={tickets} />}
         </div>
 
-        <div className="card animate-fade-up stagger-4" style={{ gridColumn: '3 / 4', padding: '1.25rem' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-            Resolution Progress
-          </h3>
-          {loading
-            ? <div className="skeleton" style={{ height: 180, borderRadius: 8, marginTop: '0.5rem' }} />
-            : <GaugeChart value={resRate} closed={closed} total={total} inProgress={inProgress} />
-          }
-        </div>
-
-        <div className="animate-fade-up stagger-3" style={{ gridColumn: '4 / 5', gridRow: '3 / 4' }}>
+        <div className="animate-fade-up stagger-3 md:col-span-2 xl:col-span-1">
           {loading
             ? <div className="card" style={{ height: '100%' }}><div className="skeleton" style={{ height: '100%', borderRadius: 16 }} /></div>
             : <TicketQueue tickets={tickets} />
           }
-        </div>
-
-        {/* ── Row 4: Timer (col 4) ── */}
-        <div className="animate-fade-up stagger-4" style={{ gridColumn: '4 / 5', gridRow: '4 / 5' }}>
-          <ResponseTimer />
         </div>
 
       </div>
