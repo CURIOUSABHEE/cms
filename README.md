@@ -142,7 +142,10 @@ DATABASE_URL=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmod
 # 4. Initialize the database tables
 npm run db:init
 
-# 5. Start the dev server
+# 5. (Optional) Seed with sample data (demo user + 10 tickets)
+npm run db:seed
+
+# 6. Start the dev server
 npm run dev
 ```
 
@@ -157,6 +160,7 @@ Open [http://localhost:3000](http://localhost:3000) to use the application.
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
 | `npm run db:init` | Initialize database tables |
+| `npm run db:seed` | Seed database with demo user and sample tickets |
 
 ## Project Structure
 
