@@ -2,6 +2,11 @@
 
 **Live demo:** [https://cms-chi-orpin.vercel.app](https://cms-chi-orpin.vercel.app/)
 
+**Demo credentials:**
+| Role | Email | Password |
+|------|-------|----------|
+| Demo User | `demo@example.com` | `password123` |
+
 A modern, productivity-focused customer support ticketing system built with Next.js. Features a clean, Linear/Notion-inspired UI with a deep forest green palette, soft rounded corners, and real-time analytics.
 
 ## Tech Stack
