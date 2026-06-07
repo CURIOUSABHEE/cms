@@ -1,11 +1,12 @@
 # SupportDesk — Customer Support CRM
 
-**Live demo:** [https://cms-chi-orpin.vercel.app](https://cms-chi-orpin.vercel.app/)
+**REGISTER NOW:** [https://cms-chi-orpin.vercel.app](https://cms-chi-orpin.vercel.app/)
+**DEMO VIDEO:** [[https://www.loom.com/share/bc5ae53213fe494da7393a6ec94670c9](https://www.loom.com/share/bc5ae53213fe494da7393a6ec94670c9)]
 
-**Demo credentials:**
+**credentials for ADMIN:**
 | Role | Email | Password |
 |------|-------|----------|
-| Demo User | `demo@example.com` | `password123` |
+| ADMIN | `abc@gmail.com` | `password` |
 
 A modern, productivity-focused customer support ticketing system built with Next.js. Features a clean, Linear/Notion-inspired UI with a deep forest green palette, soft rounded corners, and real-time analytics.
 
