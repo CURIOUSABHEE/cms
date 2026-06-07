@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
         'open': 'OPEN',
         'in progress': 'IN_PROGRESS',
         'in_progress': 'IN_PROGRESS',
-        'waiting for customer': 'WAITING_FOR_CUSTOMER',
-        'waiting_for_customer': 'WAITING_FOR_CUSTOMER',
+        'waiting for customer': 'IN_PROGRESS',
+        'waiting_for_customer': 'IN_PROGRESS',
         'resolved': 'RESOLVED',
         'closed': 'CLOSED'
       }
@@ -55,8 +55,8 @@ export async function GET(request: NextRequest) {
         'low': 'LOW',
         'medium': 'MEDIUM',
         'high': 'HIGH',
-        'urgent': 'CRITICAL',
-        'critical': 'CRITICAL'
+        'urgent': 'HIGH',
+        'critical': 'HIGH'
       }
       const mappedPriority = priorityMap[priority.toLowerCase()] || priority.toUpperCase()
       where.priority = mappedPriority as any
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
         customerId: targetCustomerId,
         subject,
         description,
-        priority: priority || 'MEDIUM',
+        priority: session.role === 'CUSTOMER' ? null : (priority || null),
         status: 'OPEN',
         categoryId,
       }

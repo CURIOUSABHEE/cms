@@ -17,13 +17,11 @@ enum Priority {
   LOW
   MEDIUM
   HIGH
-  CRITICAL
 }
 
 enum Status {
   OPEN
   IN_PROGRESS
-  WAITING_FOR_CUSTOMER
   RESOLVED
   CLOSED
 }
@@ -68,7 +66,7 @@ model Ticket {
   assignedAgentId String?   @map("assigned_agent_id") @db.Uuid
   subject         String
   description     String
-  priority        Priority  @default(MEDIUM)
+  priority        Priority?
   status          Status    @default(OPEN)
   categoryId      String    @map("category_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at")

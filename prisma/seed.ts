@@ -116,7 +116,7 @@ async function main() {
       assignedAgentId: admin.id, // assigned to admin
       subject: 'Billing discrepancy on invoice #1042',
       description: 'My invoice shows a different amount than what was agreed upon in the contract.',
-      priority: Priority.CRITICAL,
+      priority: null,
       status: Status.IN_PROGRESS,
       categoryId: billing.id,
       createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
@@ -148,7 +148,7 @@ async function main() {
     customerId: string,
     subject: string,
     description: string,
-    priority: Priority,
+    priority: Priority | null,
     status: Status,
     categoryId: string,
     assignedAgentId: string | null = null,
@@ -236,8 +236,8 @@ async function main() {
     {
       subject: 'Dashboard reports returning empty stats',
       description: 'When filtering by custom date ranges on the analytics dashboard, some graphs fail to load and return blank views.',
-      priority: Priority.CRITICAL,
-      status: Status.WAITING_FOR_CUSTOMER,
+      priority: null,
+      status: Status.IN_PROGRESS,
       category: bug,
       agent: admin,
     }
@@ -259,7 +259,7 @@ async function main() {
       createdAt
     )
 
-    if (tInfo.status === Status.IN_PROGRESS || tInfo.status === Status.WAITING_FOR_CUSTOMER || tInfo.status === Status.RESOLVED) {
+    if (tInfo.status === Status.IN_PROGRESS || tInfo.status === Status.RESOLVED) {
       await prisma.ticketComment.create({
         data: {
           ticketId: t.id,
@@ -375,8 +375,8 @@ async function main() {
       const subjectIndex = (idx * 2 + tIdx) % predefinedSubjects.length
       const subject = predefinedSubjects[subjectIndex]
       const description = predefinedDescriptions[subjectIndex]
-      const priority = [Priority.LOW, Priority.MEDIUM, Priority.HIGH, Priority.CRITICAL][(idx + tIdx) % 4]
-      const status = [Status.OPEN, Status.IN_PROGRESS, Status.WAITING_FOR_CUSTOMER, Status.RESOLVED, Status.CLOSED][(idx * 3 + tIdx) % 5]
+      const priority = [Priority.LOW, Priority.MEDIUM, Priority.HIGH, null][(idx + tIdx) % 4]
+      const status = [Status.OPEN, Status.IN_PROGRESS, Status.RESOLVED, Status.CLOSED][(idx * 3 + tIdx) % 4]
       const category = allCategories[(idx + tIdx) % allCategories.length]
       const assignedAgent = status !== Status.OPEN ? admin : null // assign to admin if not open
 

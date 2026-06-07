@@ -114,9 +114,6 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticket_
   const [isInternal, setIsInternal] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
   
-  // Agents List (Staff only)
-  const [agents, setAgents] = useState<AgentUser[]>([])
-  
   // Attachment upload simulation
   const [mockFileName, setMockFileName] = useState('')
   const [addingAttachment, setAddingAttachment] = useState(false)
@@ -137,7 +134,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticket_
       const data: TicketDetail = await res.json()
       setTicket(data)
       setStatus(data.status)
-      setPriority(data.priority)
+      setPriority(data.priority || '')
       setAssignedAgentId(data.agent?.id || 'unassigned')
     } catch {
       toast.error('Network error loading ticket')
@@ -146,28 +143,9 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticket_
     }
   }, [ticket_id])
 
-  const fetchAgents = useCallback(async () => {
-    if (!user || user.role === 'CUSTOMER') return
-    try {
-      const res = await fetch('/api/users')
-      if (res.ok) {
-        const data = await res.json()
-        if (Array.isArray(data)) {
-          setAgents(data.filter((u: AgentUser) => u.role === 'ADMIN'))
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch agents', err)
-    }
-  }, [user])
-
   useEffect(() => {
     fetchTicket()
   }, [fetchTicket])
-
-  useEffect(() => {
-    fetchAgents()
-  }, [fetchAgents])
 
   const handleUpdateMetadata = async () => {
     setSavingMeta(true)
@@ -322,7 +300,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticket_
   if (loading || !ticket) return <SkeletonDetail />
 
   const isCustomer = user?.role === 'CUSTOMER'
-  const isDirty = status !== ticket.status || priority !== ticket.priority || assignedAgentId !== (ticket.agent?.id || 'unassigned')
+  const isDirty = status !== ticket.status || priority !== (ticket.priority || '')
 
   return (
     <div style={{ padding: '1.75rem 2rem', maxWidth: '1200px', margin: '0 auto' }}>
@@ -612,14 +590,10 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticket_
                   <span style={{ color: 'var(--text-muted)' }}>Status:</span>
                   <StatusBadge status={ticket.status} />
 </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Priority:</span>
                   <PriorityBadge priority={ticket.priority} />
                 </div>
-                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
-                   <span style={{ color: 'var(--text-muted)' }}>Assigned Staff:</span>
-                   <span style={{ fontWeight: 600 }}>{ticket.agent?.name || 'Awaiting assignment'}</span>
-                 </div>
                 
                 {ticket.status !== 'CLOSED' && ticket.status !== 'RESOLVED' && (
                   <button
@@ -660,7 +634,6 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticket_
                   >
                     <option value="OPEN">Open</option>
                     <option value="IN_PROGRESS">In Progress</option>
-                    <option value="WAITING_FOR_CUSTOMER">Waiting For Customer</option>
                     <option value="RESOLVED">Resolved</option>
                     <option value="CLOSED">Closed</option>
                   </select>
@@ -672,35 +645,18 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticket_
                     Priority
                   </label>
                   <select
-                    value={priority}
+                    value={priority || ''}
                     onChange={e => setPriority(e.target.value)}
                     className="select"
                     style={{ width: '100%' }}
                   >
+                    {!priority && <option value="">-- Select Priority --</option>}
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
                     <option value="HIGH">High</option>
-                    <option value="CRITICAL">Critical</option>
                   </select>
                 </div>
 
-                {/* Assigned Agent dropdown */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
-                    Assigned Staff
-                  </label>
-                  <select
-                    value={assignedAgentId}
-                    onChange={e => setAssignedAgentId(e.target.value)}
-                    className="select"
-                    style={{ width: '100%' }}
-                  >
-                    <option value="unassigned">Unassigned</option>
-                    {agents.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} (Admin)</option>
-                    ))}
-                  </select>
-                </div>
 
                 {/* Save metadata button */}
                 <button
@@ -713,6 +669,49 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticket_
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Customer Info Card */}
+          <div className="card" style={{ padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green-700)" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Customer Info
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div
+                style={{
+                  width: '38px', height: '38px', borderRadius: '50%',
+                  background: 'var(--green-900)', color: '#fff',
+                  fontWeight: 700, fontSize: '0.875rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                {ticket.customer.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  {ticket.customer.name}
+                </p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+                  {ticket.customer.email}
+                </p>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', fontSize: '0.8rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Role:</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Customer</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Opened Ticket:</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                  {new Date(ticket.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Ticket Timeline History Card */}

@@ -12,7 +12,6 @@ import {
 type Props = { data: Record<string, number> }
 
 const COLORS = {
-  Urgent: '#ef4444',
   High:   '#f97316',
   Medium: '#eab308',
   Low:    '#22c55e',

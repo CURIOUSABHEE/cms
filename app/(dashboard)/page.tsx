@@ -25,7 +25,13 @@ type Analytics = {
   total: number
   byStatus: Record<string, number>
   byPriority: Record<string, number>
-  ticketsPerDay: { date: string; count: number }[]
+  ticketsPerDay: { date: string; created: number; resolved: number }[]
+  trends?: {
+    total: number
+    closed: number
+    inProgress: number
+    open: number
+  }
 }
 
 /* ── Skeleton helpers ───────────────────────────────────── */
@@ -52,52 +58,101 @@ function ArrowIcon({ color = 'var(--text-muted)' }: { color?: string }) {
 }
 
 /* ── Stat card (light) ──────────────────────────────────── */
-function StatCard({ label, value, sub, href }: { label: string; value: number; sub: string; href?: string }) {
+function StatCard({ label, value, sub, trend, href }: { label: string; value: number; sub?: string; trend?: number; href?: string }) {
+  const isPositive = trend !== undefined && trend >= 0
   return (
-    <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-        <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{label}</p>
-        <Link href={href ?? '#'} style={{ textDecoration: 'none' }}>
-          <ArrowIcon />
-        </Link>
-      </div>
-      <p style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1, marginBottom: '0.5rem', fontVariantNumeric: 'tabular-nums' }}>
-        {value}
-      </p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--green-50)', borderRadius: '999px', padding: '2px 6px' }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--green-600)" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
-          </svg>
-          <span style={{ fontSize: '0.65rem', color: 'var(--green-700)', fontWeight: 600 }}>{sub}</span>
+    <div className="card" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+          <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{label}</p>
+          {href && (
+            <Link href={href} style={{ textDecoration: 'none' }}>
+              <ArrowIcon />
+            </Link>
+          )}
         </div>
+        <p style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1, marginBottom: '0.5rem', fontVariantNumeric: 'tabular-nums' }}>
+          {value}
+        </p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        {trend !== undefined && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            background: isPositive ? 'var(--green-50)' : 'var(--prio-urgent-bg)',
+            borderRadius: '999px',
+            padding: '2px 8px',
+            border: `1px solid ${isPositive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`
+          }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={isPositive ? 'var(--green-600)' : 'var(--prio-urgent)'} strokeWidth={2.5}>
+              {isPositive ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 7L7 17M7 17h10M7 17V7" />
+              )}
+            </svg>
+            <span style={{ fontSize: '0.65rem', color: isPositive ? 'var(--green-700)' : 'var(--prio-urgent)', fontWeight: 700 }}>
+              {isPositive ? '+' : ''}{trend}%
+            </span>
+          </div>
+        )}
+        {sub && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+            {sub}
+          </span>
+        )}
       </div>
     </div>
   )
 }
 
 /* ── Stat card (dark — Total Tickets) ───────────────────── */
-function StatCardDark({ value, label = "Total Tickets", sub = "Increased from last month" }: { value: number; label?: string; sub?: string }) {
+function StatCardDark({ value, label = "Total Tickets", sub, trend }: { value: number; label?: string; sub?: string; trend?: number }) {
+  const isPositive = trend !== undefined && trend >= 0
   return (
-    <div className="card-dark" style={{ padding: '1.25rem 1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-        <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)' }}>{label}</p>
-        <div style={{ width: 28, height: 28, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
-          </svg>
+    <div className="card-dark" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+          <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)' }}>{label}</p>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
+            </svg>
+          </div>
         </div>
+        <p style={{ fontSize: '2.25rem', fontWeight: 800, color: '#fff', lineHeight: 1, marginBottom: '0.5rem', fontVariantNumeric: 'tabular-nums' }}>
+          {value}
+        </p>
       </div>
-      <p style={{ fontSize: '2.25rem', fontWeight: 800, color: '#fff', lineHeight: 1, marginBottom: '0.5rem', fontVariantNumeric: 'tabular-nums' }}>
-        {value}
-      </p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(255,255,255,0.12)', borderRadius: '999px', padding: '2px 8px' }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
-          </svg>
-          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>{sub}</span>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        {trend !== undefined && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            background: isPositive ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+            borderRadius: '999px',
+            padding: '2px 8px',
+          }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5}>
+              {isPositive ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 7L7 17M7 17h10M7 17V7" />
+              )}
+            </svg>
+            <span style={{ fontSize: '0.65rem', color: '#fff', fontWeight: 700 }}>
+              {isPositive ? '+' : ''}{trend}%
+            </span>
+          </div>
+        )}
+        {sub && (
+          <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>
+            {sub}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -105,7 +160,7 @@ function StatCardDark({ value, label = "Total Tickets", sub = "Increased from la
 
 /* ── Recent activity (SLA alerts) ───────────────────────── */
 function RecentActivity({ tickets }: { tickets: Ticket[] }) {
-  const urgent = tickets.filter(t => t.priority === 'CRITICAL' || t.priority === 'HIGH' || t.status === 'OPEN').slice(0, 1)
+  const urgent = tickets.filter(t => t.priority === 'HIGH' || t.status === 'OPEN').slice(0, 1)
   const ticket = urgent[0]
   return (
     <div className="card" style={{ padding: '1.25rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -153,33 +208,60 @@ function TicketQueue({ tickets }: { tickets: Ticket[] }) {
         </Link>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {tickets.slice(0, 5).map((t, i) => (
-          <Link
-            key={t.ticket_id}
-            href={`/tickets/${t.ticket_id}`}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none' }}
-          >
-            <div
+        {tickets.slice(0, 5).map((t, i) => {
+          const isNew = !t.priority
+          return (
+            <Link
+              key={t.ticket_id}
+              href={`/tickets/${t.ticket_id}`}
               style={{
-                width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
-                background: QUEUE_COLORS[i % QUEUE_COLORS.length],
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                textDecoration: 'none',
+                padding: isNew ? '0.375rem 0.5rem' : '0',
+                borderRadius: isNew ? 'var(--radius-md)' : '0',
+                borderLeft: isNew ? '3px solid var(--green-600)' : '3px solid transparent',
+                background: isNew ? 'var(--green-50)' : 'transparent',
+                transition: 'all 0.2s ease',
               }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {t.subject}
-              </p>
-              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Due: {new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </p>
-            </div>
-          </Link>
-        ))}
+              <div
+                style={{
+                  width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
+                  background: QUEUE_COLORS[i % QUEUE_COLORS.length],
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>
+                    {t.subject}
+                  </p>
+                  {isNew && (
+                    <span style={{
+                      fontSize: '0.6rem',
+                      fontWeight: 800,
+                      backgroundColor: 'var(--green-900)',
+                      color: '#fff',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                    }}>
+                      NEW
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                  Created: {new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            </Link>
+          )
+        })}
         {tickets.length === 0 && (
           <p style={{ fontSize: '0.8rem', color: 'var(--text-faint)', textAlign: 'center', padding: '1rem 0' }}>
             No tickets yet
@@ -202,29 +284,58 @@ function TeamCollaboration({ tickets }: { tickets: Ticket[] }) {
         </Link>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {tickets.slice(0, 5).map((t, i) => (
-          <div key={t.ticket_id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {tickets.slice(0, 5).map((t, i) => {
+          const isNew = !t.priority
+          return (
             <div
+              key={t.ticket_id}
               style={{
-                width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
-                background: AVATARS[i % AVATARS.length],
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontWeight: 700, fontSize: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: isNew ? '0.375rem 0.5rem' : '0',
+                borderRadius: isNew ? 'var(--radius-md)' : '0',
+                borderLeft: isNew ? '3px solid var(--green-600)' : '3px solid transparent',
+                background: isNew ? 'var(--green-50)' : 'transparent',
+                transition: 'all 0.2s ease',
               }}
             >
-              {t.customer_name.charAt(0).toUpperCase()}
+              <div
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
+                  background: AVATARS[i % AVATARS.length],
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: 700, fontSize: '0.75rem',
+                }}
+              >
+                {t.customer_name.charAt(0).toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                    {t.customer_name}
+                  </p>
+                  {isNew && (
+                    <span style={{
+                      fontSize: '0.6rem',
+                      fontWeight: 800,
+                      backgroundColor: 'var(--green-900)',
+                      color: '#fff',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                    }}>
+                      NEW
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: '2px 0 0' }}>
+                  Working on <span style={{ fontWeight: 700 }}>{t.subject}</span>
+                </p>
+              </div>
+              <StatusBadge status={t.status} />
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {t.customer_name}
-              </p>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Working on <span style={{ fontWeight: 700 }}>{t.subject}</span>
-              </p>
-            </div>
-            <StatusBadge status={t.status} />
-          </div>
-        ))}
+          )
+        })}
         {tickets.length === 0 && (
           <p style={{ fontSize: '0.8rem', color: 'var(--text-faint)', textAlign: 'center', padding: '1rem 0' }}>
             No tickets
@@ -236,8 +347,8 @@ function TeamCollaboration({ tickets }: { tickets: Ticket[] }) {
 }
 
 /* ── Customer Portal View ────────────────────────────────── */
-function CustomerDashboardView({ tickets, loading, user }: { tickets: Ticket[]; loading: boolean; user: any }) {
-  const activeCount = tickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS' || t.status === 'WAITING_FOR_CUSTOMER').length
+function CustomerDashboardView({ tickets, loading, user }: { tickets: Ticket[]; loading: boolean; user: { name: string; role: string } | null }) {
+  const activeCount = tickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length
   const resolvedCount = tickets.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED').length
   
   return (
@@ -326,7 +437,7 @@ function CustomerDashboardView({ tickets, loading, user }: { tickets: Ticket[]; 
                       <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--green-50)', border: '1px solid var(--green-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
                         🎫
                       </div>
-                      <p style={{ fontWeight: 700, color: 'var(--text-primary)' }}>You don't have any support tickets yet.</p>
+                      <p style={{ fontWeight: 700, color: 'var(--text-primary)' }}>You don&apos;t have any support tickets yet.</p>
                       <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>If you need help with an order, billing, or technical issues, create a support ticket.</p>
                       <Link href="/tickets/new" className="btn-primary" style={{ textDecoration: 'none' }}>Submit a Ticket</Link>
                     </div>
@@ -405,6 +516,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchData()
     }
   }, [user, fetchData])
@@ -454,7 +566,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}><Sk w={80} h={12} /> <Sk w={28} h={28} r={14} /></div>
               <Sk w={48} h={36} r={6} /> <div style={{ marginTop: '0.5rem' }}><Sk w={140} h={16} r={8} /></div>
             </div>
-          ) : <StatCardDark value={total} />}
+          ) : <StatCardDark value={total} label="Total Tickets" sub="vs last week" trend={analytics?.trends?.total} />}
         </div>
 
         <div className="animate-fade-up stagger-2">
@@ -463,7 +575,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}><Sk w={80} h={12} /> <Sk w={28} h={28} r={14} /></div>
               <Sk w={48} h={36} r={6} /> <div style={{ marginTop: '0.5rem' }}><Sk w={140} h={16} r={8} /></div>
             </div>
-          ) : <StatCard label="Closed Tickets" value={closed} sub="Increased from last month" href="/tickets?status=Closed" />}
+          ) : <StatCard label="Closed Tickets" value={closed} sub="vs last week" trend={analytics?.trends?.closed} href="/tickets?status=Closed" />}
         </div>
 
         <div className="animate-fade-up stagger-3">
@@ -472,7 +584,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}><Sk w={80} h={12} /> <Sk w={28} h={28} r={14} /></div>
               <Sk w={48} h={36} r={6} /> <div style={{ marginTop: '0.5rem' }}><Sk w={140} h={16} r={8} /></div>
             </div>
-          ) : <StatCard label="In Progress" value={inProgress} sub="Increased from last month" href="/tickets?status=In Progress" />}
+          ) : <StatCard label="In Progress" value={inProgress} sub="vs last week" trend={analytics?.trends?.inProgress} href="/tickets?status=In Progress" />}
         </div>
 
         <div className="animate-fade-up stagger-4">
@@ -482,22 +594,28 @@ export default function Dashboard() {
               <Sk w={48} h={36} r={6} /> <div style={{ marginTop: '0.5rem' }}><Sk w={140} h={16} r={8} /></div>
             </div>
           ) : (
-            <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Open Tickets</p>
-                <Link href="/tickets?status=Open" style={{ textDecoration: 'none' }}><ArrowIcon /></Link>
-              </div>
-              <p style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1, marginBottom: '0.5rem', fontVariantNumeric: 'tabular-nums' }}>{open}</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Awaiting response</p>
-            </div>
+            <StatCard label="Open Tickets" value={open} sub="vs last week" trend={analytics?.trends?.open} href="/tickets?status=Open" />
           )}
         </div>
 
         {/* ── Row 2: Analytics chart (col 1-3) | Reminders (col 4) ── */}
         <div className="card animate-fade-up stagger-2 md:col-span-2 xl:col-span-3" style={{ padding: '1.25rem 1.5rem' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1.25rem' }}>
-            Ticket Analytics
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem', flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Ticket Analytics
+            </h3>
+            {/* Legend */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.78rem', fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--green-900)' }} />
+                <span style={{ color: 'var(--text-muted)' }}>Created</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--green-300)' }} />
+                <span style={{ color: 'var(--text-muted)' }}>Resolved</span>
+              </div>
+            </div>
+          </div>
           {loading || !analytics
             ? <div className="skeleton" style={{ height: 200, borderRadius: 8 }} />
             : <TicketChart data={analytics.ticketsPerDay} />

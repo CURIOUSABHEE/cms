@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -9,6 +9,14 @@ import { useAuth } from '@/app/context/AuthContext'
 type Category = {
   id: string
   name: string
+}
+
+type UserItem = {
+  id: string
+  name: string
+  email: string
+  role: string
+  isActive: boolean
 }
 
 type FormData = {
@@ -24,7 +32,6 @@ const PRIORITIES = [
   { label: 'Low', value: 'LOW', color: 'var(--prio-low)', bg: 'var(--prio-low-bg)' },
   { label: 'Medium', value: 'MEDIUM', color: 'var(--prio-medium)', bg: 'var(--prio-medium-bg)' },
   { label: 'High', value: 'HIGH', color: 'var(--prio-high)', bg: 'var(--prio-high-bg)' },
-  { label: 'Critical', value: 'CRITICAL', color: 'var(--prio-urgent)', bg: 'var(--prio-urgent-bg)' },
 ]
 
 function Field({ label, required, hint, error, children }: { label: string; required?: boolean; hint?: string; error?: string; children: React.ReactNode }) {
@@ -45,6 +52,7 @@ function Field({ label, required, hint, error, children }: { label: string; requ
 export default function NewTicketPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const isCustomer = user?.role === 'CUSTOMER'
   
   const [categories, setCategories] = useState<Category[]>([])
   const [form, setForm] = useState<FormData>({
@@ -58,6 +66,122 @@ export default function NewTicketPage() {
   const [errors, setErrors] = useState<Partial<FormData>>({})
   const [sending, setSending] = useState(false)
   const [loadingCategories, setLoadingCategories] = useState(true)
+
+  // Autocomplete states & refs
+  const [suggestions, setSuggestions] = useState<UserItem[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    setLoadingSuggestions(true)
+    try {
+      const res = await fetch(`/api/users?search=${encodeURIComponent(query)}`)
+      if (res.ok) {
+        const data = await res.json()
+        // Filter to active users
+        const activeUsers = (data as UserItem[]).filter(u => u.isActive)
+        setSuggestions(activeUsers)
+        setShowSuggestions(true)
+        setActiveSuggestionIndex(-1)
+      } else {
+        setSuggestions([])
+      }
+    } catch (err) {
+      console.error('Error fetching suggestions:', err)
+      setSuggestions([])
+    } finally {
+      setLoadingSuggestions(false)
+    }
+  }, [])
+
+  const handleCustomerNameChange = (val: string) => {
+    update('customer_name', val)
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (!val.trim()) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchSuggestions(val)
+    }, 300)
+  }
+
+  const handleSelectCustomer = (selectedUser: UserItem) => {
+    setForm(prev => ({
+      ...prev,
+      customer_name: selectedUser.name,
+      customer_email: selectedUser.email,
+    }))
+    
+    // Clear validation errors for name & email
+    if (errors.customer_name) setErrors(prev => ({ ...prev, customer_name: undefined }))
+    if (errors.customer_email) setErrors(prev => ({ ...prev, customer_email: undefined }))
+    
+    setSuggestions([])
+    setShowSuggestions(false)
+    setActiveSuggestionIndex(-1)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveSuggestionIndex(prev => (prev + 1) % suggestions.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length)
+    } else if (e.key === 'Enter') {
+      if (activeSuggestionIndex >= 0 && activeSuggestionIndex < suggestions.length) {
+        e.preventDefault()
+        handleSelectCustomer(suggestions[activeSuggestionIndex])
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+      setActiveSuggestionIndex(-1)
+    }
+  }
+
+  const handleInputFocus = () => {
+    if (form.customer_name.trim() && suggestions.length > 0) {
+      setShowSuggestions(true)
+    }
+  }
+
+  // Click outside listener to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Clear timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Fetch available categories
   useEffect(() => {
@@ -83,6 +207,7 @@ export default function NewTicketPage() {
   // Prefill user details if CUSTOMER
   useEffect(() => {
     if (user && user.role === 'CUSTOMER') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm(prev => ({
         ...prev,
         customer_name: user.name,
@@ -118,9 +243,9 @@ export default function NewTicketPage() {
       const payload = {
         subject: form.subject.trim(),
         description: form.description.trim(),
-        priority: form.priority,
+        priority: isCustomer ? null : form.priority,
         categoryId: form.categoryId,
-        customerEmail: user?.role === 'CUSTOMER' ? undefined : form.customer_email.trim(),
+        customerEmail: isCustomer ? undefined : form.customer_email.trim(),
       }
 
       const res = await fetch('/api/tickets', {
@@ -129,7 +254,7 @@ export default function NewTicketPage() {
         body: JSON.stringify(payload),
       })
       if (res.ok) {
-        const data = await res.json()
+        await res.json()
         toast.success(`Ticket created successfully!`)
         router.push(user?.role === 'CUSTOMER' ? '/' : '/tickets')
       } else {
@@ -142,8 +267,6 @@ export default function NewTicketPage() {
       setSending(false)
     }
   }
-
-  const isCustomer = user?.role === 'CUSTOMER'
 
   return (
     <div style={{ padding: '1.75rem 2rem', maxWidth: '760px', margin: '0 auto' }}>
@@ -190,11 +313,91 @@ export default function NewTicketPage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
                 <Field label="Customer Name" required error={errors.customer_name}>
-                  <input
-                    type="text" value={form.customer_name} onChange={e => update('customer_name', e.target.value)}
-                    placeholder="John Doe" className="input"
-                    style={errors.customer_name ? { borderColor: 'var(--prio-urgent)', boxShadow: '0 0 0 3px rgba(239,68,68,0.1)' } : {}}
-                  />
+                  <div ref={containerRef} style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={form.customer_name}
+                      onChange={e => handleCustomerNameChange(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      onFocus={handleInputFocus}
+                      placeholder="John Doe"
+                      className="input"
+                      style={errors.customer_name ? { borderColor: 'var(--prio-urgent)', boxShadow: '0 0 0 3px rgba(239,68,68,0.1)' } : {}}
+                      autoComplete="off"
+                    />
+                    {loadingSuggestions && (
+                      <div style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faint)' }}>
+                          <circle cx="12" cy="12" r="10" strokeOpacity={0.3} />
+                          <path d="M4 12a8 8 0 018-8" />
+                        </svg>
+                      </div>
+                    )}
+                    {showSuggestions && (
+                      <ul style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 100,
+                        marginTop: '0.375rem',
+                        maxHeight: '220px',
+                        overflowY: 'auto',
+                        backgroundColor: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: 'var(--shadow-md)',
+                        listStyle: 'none',
+                        padding: '0.25rem 0',
+                      }}>
+                        {suggestions.length > 0 ? (
+                          suggestions.map((user, idx) => {
+                            const isActive = idx === activeSuggestionIndex
+                            return (
+                              <li
+                                key={user.id}
+                                onClick={() => handleSelectCustomer(user)}
+                                onMouseEnter={() => setActiveSuggestionIndex(idx)}
+                                style={{
+                                  padding: '0.625rem 1rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.15rem',
+                                  transition: 'all 0.15s ease',
+                                  backgroundColor: isActive ? 'var(--bg-hover)' : 'transparent',
+                                  borderLeft: isActive ? '3px solid var(--green-600)' : '3px solid transparent',
+                                  paddingLeft: isActive ? 'calc(1rem - 3px)' : '1rem',
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>{user.name}</span>
+                                  {user.role !== 'CUSTOMER' && (
+                                    <span style={{ 
+                                      fontSize: '0.65rem', 
+                                      fontWeight: 700, 
+                                      textTransform: 'uppercase', 
+                                      color: 'var(--green-700)', 
+                                      background: 'var(--green-50)', 
+                                      padding: '1px 5px', 
+                                      borderRadius: '4px' 
+                                    }}>
+                                      {user.role === 'SUPPORT_AGENT' ? 'Agent' : 'Admin'}
+                                    </span>
+                                  )}
+                                </div>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{user.email}</span>
+                              </li>
+                            )
+                          })
+                        ) : (
+                          <li style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>
+                            No matching customers found
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
                 </Field>
                 <Field label="Customer Email" required error={errors.customer_email}>
                   <input
@@ -250,26 +453,28 @@ export default function NewTicketPage() {
 
             <hr className="divider" />
 
-            {/* Priority */}
-            <div>
-              <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.625rem' }}>Priority Level</p>
-              <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
-                {PRIORITIES.map(p => (
-                  <button
-                    key={p.value} type="button" onClick={() => update('priority', p.value)}
-                    style={{
-                      padding: '0.375rem 1rem', borderRadius: 'var(--radius-full)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-                      border: form.priority === p.value ? `1.5px solid ${p.color}` : '1.5px solid var(--border)',
-                      background: form.priority === p.value ? p.bg : 'transparent',
-                      color: form.priority === p.value ? p.color : 'var(--text-muted)',
-                      fontFamily: 'var(--font)',
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+            {/* Priority (Only for Staff/Admin, hidden for Customer) */}
+            {!isCustomer && (
+              <div>
+                <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.625rem' }}>Priority Level</p>
+                <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
+                  {PRIORITIES.map(p => (
+                    <button
+                      key={p.value} type="button" onClick={() => update('priority', p.value)}
+                      style={{
+                        padding: '0.375rem 1rem', borderRadius: 'var(--radius-full)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                        border: form.priority === p.value ? `1.5px solid ${p.color}` : '1.5px solid var(--border)',
+                        background: form.priority === p.value ? p.bg : 'transparent',
+                        color: form.priority === p.value ? p.color : 'var(--text-muted)',
+                        fontFamily: 'var(--font)',
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '0.25rem' }}>

@@ -110,7 +110,7 @@ export default function TicketsPage() {
             All Tickets
           </h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-            {loading ? 'Loading tickets…' : `${tickets.length} ticket${tickets.length !== 1 ? 's' : ''} found`}
+            {loading ? 'Loading tickets…' : `${totalTickets} ticket${totalTickets !== 1 ? 's' : ''} found`}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
@@ -155,12 +155,12 @@ export default function TicketsPage() {
           <option value="">All Status</option>
           <option value="Open">Open</option>
           <option value="In Progress">In Progress</option>
+          <option value="Resolved">Resolved</option>
           <option value="Closed">Closed</option>
         </select>
 
         <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} className="select" style={{ minWidth: '150px', borderRadius: 'var(--radius-full)' }}>
           <option value="">All Priority</option>
-          <option value="Urgent">Urgent</option>
           <option value="High">High</option>
           <option value="Medium">Medium</option>
           <option value="Low">Low</option>
@@ -213,27 +213,52 @@ export default function TicketsPage() {
                   </td>
                 </tr>
               ) : (
-                tickets.map(t => (
-                  <tr key={t.ticket_id} className="table-row">
-                    <td style={{ padding: '0.875rem 1.25rem' }}>
-                      <Link href={`/tickets/${t.ticket_id}`} className="ticket-id" style={{ textDecoration: 'none' }}>
-                        {t.ticket_id}
-                      </Link>
-                    </td>
-                    <td style={{ padding: '0.875rem 1.25rem' }}>
-                      <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '1px' }}>{t.customer_name}</p>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.customer_email}</p>
-                    </td>
-                    <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.875rem', color: 'var(--text-secondary)', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {t.subject}
-                    </td>
-                    <td style={{ padding: '0.875rem 1.25rem' }}><StatusBadge status={t.status} /></td>
-                    <td style={{ padding: '0.875rem 1.25rem' }}><PriorityBadge priority={t.priority} /></td>
-                    <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
-                      {new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </td>
-                  </tr>
-                ))
+                tickets.map(t => {
+                  const isNew = !t.priority
+                  return (
+                    <tr
+                      key={t.ticket_id}
+                      className="table-row"
+                      style={isNew ? {
+                        background: 'var(--green-50)',
+                        borderLeft: '4px solid var(--green-600)',
+                        boxShadow: 'inset 4px 0 0 0 var(--green-600)',
+                      } : {}}
+                    >
+                      <td style={{ padding: '0.875rem 1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Link href={`/tickets/${t.ticket_id}`} className="ticket-id" style={{ textDecoration: 'none' }}>
+                            {t.ticket_id}
+                          </Link>
+                          {isNew && (
+                            <span style={{
+                              fontSize: '0.6rem',
+                              fontWeight: 800,
+                              backgroundColor: 'var(--green-900)',
+                              color: '#fff',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
+                            }}>
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.875rem 1.25rem' }}>
+                        <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '1px' }}>{t.customer_name}</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.customer_email}</p>
+                      </td>
+                      <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.875rem', color: 'var(--text-secondary)', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {t.subject}
+                      </td>
+                      <td style={{ padding: '0.875rem 1.25rem' }}><StatusBadge status={t.status} /></td>
+                      <td style={{ padding: '0.875rem 1.25rem' }}><PriorityBadge priority={t.priority} /></td>
+                      <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
+                        {new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
