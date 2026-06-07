@@ -3,7 +3,11 @@
 **REGISTER NOW:** [https://cms-chi-orpin.vercel.app](https://cms-chi-orpin.vercel.app/)
 
 
-**DEMO VIDEO:** [[https://www.loom.com/share/bc5ae53213fe494da7393a6ec94670c9]]
+**DEMO VIDEO:** 
+
+https://www.loom.com/share/bc5ae53213fe494da7393a6ec94670c9
+
+
 
 **credentials for ADMIN:**
 | Role | Email | Password |
